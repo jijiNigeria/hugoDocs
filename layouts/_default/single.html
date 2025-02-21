@@ -3,7 +3,7 @@
   <article class="max-w-5xl lg:max-w-3xl" id="article">
     {{ partial "layouts/docsheader.html" . }}
     <div class="content">
-      {{ with .Params.description }}
+      {{ with or .Params.description .Summary }}
         <div class="lead">
           {{ . | markdownify }}
         </div>
@@ -51,6 +51,12 @@
       {{ $t := debug.Timer "single.content" }}
       {{ .Content }}
       {{ $t.Stop }}
+      {{ with .Params.portabletext }}
+        {{ transform.Highlight . "json" }}
+      {{ end }}
+      {{ with .RawContent }}
+        {{ transform.Highlight . "mardkdown" }}
+      {{ end }}
       {{ $t := debug.Timer "single.page-edit" }}
       {{ partial "layouts/page-edit.html" . }}
       {{ $t.Stop }}

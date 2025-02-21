@@ -1,0 +1,67 @@
+{{ $projectID := "0pkxo5r3" }}
+{{ $useCached := true }}
+{{ $api := "api" }}
+{{ if $useCached }}
+  {{/* See https://www.sanity.io/docs/api-cdn */}}
+  {{ $api = "apicdn" }}
+{{ end }}
+{{ $url := printf "https://%s.%s.sanity.io/v2021-06-07/data/query/production"  $projectID $api }}
+
+{{/* prettier-ignore-start */ -}}
+{{ $q :=  `*[_type == 'post']{
+  title, publishedAt, summary, slug, body[]{
+    ...,
+    _type == "image" => {
+      ...,
+      asset->{
+        _id,
+        path,
+        url,
+        altText,
+        title,
+        description,
+        metadata {
+          dimensions {
+            aspectRatio,
+            width,
+            height
+          }
+        }
+      }
+    }
+  },
+  }`
+}}
+{{/* prettier-ignore-end */ -}}
+{{ $body := dict "query" $q | jsonify }}
+{{ $opts := dict "method" "post" "body" $body }}
+{{ $t := debug.Timer "sanity.get" }}
+{{ $r := resources.GetRemote $url $opts }}
+{{ $t.Stop }}
+{{ $m := $r | transform.Unmarshal }}
+{{ $result := $m.result }}
+{{ $t := debug.Timer "sanity.parse" }}
+{{ range $result }}
+  {{ if not .slug }}
+    {{ continue }}
+  {{ end }}
+  {{ $markdown := transform.PortableText .body }}
+  {{ $t.Stop }}
+  {{ $content := dict
+    "mediaType" "text/markdown"
+    "value" $markdown
+  }}
+  {{ $params := dict
+    "portabletext" (.body | jsonify (dict "indent" " "))
+  }}
+  {{ $page := dict
+    "content" $content
+    "kind" "page"
+    "path" .slug.current
+    "title" .title
+    "date" (.publishedAt | time )
+    "summary" .summary
+    "params" $params
+  }}
+  {{ $.AddPage $page }}
+{{ end }}
